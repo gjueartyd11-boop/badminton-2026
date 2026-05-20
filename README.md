@@ -1,24 +1,23 @@
-# 6학년 배드민턴 리그전 - 관리자/학생 분리 버전
+# 6학년 배드민턴 리그전 - 연동 안정화 버전
 
-## 링크 사용법
+## 링크
 
-배포 주소가 아래라고 가정하면:
+학생용:
+https://배포주소.vercel.app
 
-학생용 순위 보기 링크:
-https://내주소.vercel.app
+관리자용:
+https://배포주소.vercel.app?admin=1
 
-선생님용 입력 링크:
-https://내주소.vercel.app?admin=1
+## 이번 버전의 변경점
 
-학생용 화면에는 경기 결과 입력창이 나오지 않고, 순위와 최근 경기 결과만 표시됩니다.
-선생님이 관리자 링크에서 입력하면 Firebase를 통해 학생용 화면에 자동 반영됩니다.
+- 학생용 화면은 브라우저 저장값을 사용하지 않고 Firebase 실시간 데이터만 표시합니다.
+- 관리자 화면에서만 Firebase에 쓰기 저장합니다.
+- 화면 상단에 Firebase 연결/저장 상태가 표시됩니다.
+- 연결 실패 시 Firestore Rules 또는 설정값 문제를 바로 확인할 수 있습니다.
 
-## Firebase
+## Firebase Rules 확인
 
-이 파일에는 사용자가 제공한 firebaseConfig가 이미 들어 있습니다.
-Firestore Database와 Rules 설정이 필요합니다.
-
-테스트용 Rules:
+Firestore Database → Rules를 아래처럼 설정하고 게시하세요.
 
 rules_version = '2';
 
@@ -29,5 +28,3 @@ service cloud.firestore {
     }
   }
 }
-
-주의: 테스트용 규칙입니다. 공개 운영 시 보안을 강화하는 것이 좋습니다.

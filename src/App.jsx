@@ -13,23 +13,14 @@ const firebaseConfig = {
 
 const CLASSES = ["가람반", "나리반", "다솜반", "라온반", "마루반", "바름반", "사랑반"];
 const SET_COUNT = 5;
-const STORAGE_KEY = "grade6-badminton-league-v1";
-const FIREBASE_ENABLED = Boolean(firebaseConfig.apiKey && firebaseConfig.projectId);
-const leagueDocRef = FIREBASE_ENABLED
-  ? doc(getFirestore(initializeApp(firebaseConfig)), "leagues", "grade6-badminton")
-  : null;
+const STORAGE_KEY = "grade6-badminton-league-admin-backup-v2";
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const leagueDocRef = doc(db, "leagues", "grade6-badminton");
 
 function buildInitialTeams() {
   return CLASSES.map((name) => ({ name, games: 0, wins: 0, losses: 0, setWon: 0, setLost: 0 }));
-}
-
-function safeLoadLocal() {
-  try {
-    const saved = window.localStorage.getItem(STORAGE_KEY);
-    return saved ? JSON.parse(saved) : null;
-  } catch {
-    return null;
-  }
 }
 
 function winRate(team) {
@@ -44,70 +35,104 @@ function sortTeams(teams) {
   return [...teams].sort((a, b) => {
     const rateDiff = winRate(b) - winRate(a);
     if (rateDiff !== 0) return rateDiff;
-    const aSetDiff = a.setWon - a.setLost;
-    const bSetDiff = b.setWon - b.setLost;
-    if (bSetDiff !== aSetDiff) return bSetDiff - aSetDiff;
+
+    const setDiff = (b.setWon - b.setLost) - (a.setWon - a.setLost);
+    if (setDiff !== 0) return setDiff;
+
     if (b.setWon !== a.setWon) return b.setWon - a.setWon;
     if (b.wins !== a.wins) return b.wins - a.wins;
     return a.name.localeCompare(b.name, "ko");
   });
 }
 
+function loadAdminBackup() {
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function App() {
-  const params = new URLSearchParams(window.location.search);
-  const isAdmin = params.get("admin") === "1";
-  const localData = safeLoadLocal();
+  const isAdmin = new URLSearchParams(window.location.search).get("admin") === "1";
+  const adminBackup = isAdmin ? loadAdminBackup() : null;
 
   const [teamA, setTeamA] = useState("");
   const [teamB, setTeamB] = useState("");
   const [sets, setSets] = useState(Array(SET_COUNT).fill(""));
-  const [teams, setTeams] = useState(localData?.teams || buildInitialTeams());
-  const [history, setHistory] = useState(localData?.history || []);
-  const [savedNotice, setSavedNotice] = useState(false);
-  const [cloudReady, setCloudReady] = useState(!FIREBASE_ENABLED);
-  const loadedFromCloud = useRef(false);
+  const [teams, setTeams] = useState(adminBackup?.teams || buildInitialTeams());
+  const [history, setHistory] = useState(adminBackup?.history || []);
+  const [cloudStatus, setCloudStatus] = useState("Firebase 연결 확인 중");
+  const [lastSaved, setLastSaved] = useState("");
+  const [cloudLoaded, setCloudLoaded] = useState(false);
+
+  const ignoreNextWrite = useRef(false);
 
   const selectedBoth = teamA && teamB && teamA !== teamB;
   const completeSets = sets.every(Boolean);
   const aSetWins = sets.filter((winner) => winner === teamA).length;
   const bSetWins = sets.filter((winner) => winner === teamB).length;
   const matchWinner = selectedBoth && completeSets ? (aSetWins > bSetWins ? teamA : teamB) : "";
-  const canSubmit = selectedBoth && completeSets && aSetWins !== bSetWins;
+  const canSubmit = isAdmin && selectedBoth && completeSets && aSetWins !== bSetWins;
   const ranking = useMemo(() => sortTeams(teams), [teams]);
 
   useEffect(() => {
-    if (!FIREBASE_ENABLED || !leagueDocRef) return;
-    const unsubscribe = onSnapshot(leagueDocRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.data();
-        setTeams(data.teams || buildInitialTeams());
-        setHistory(data.history || []);
+    setCloudStatus("Firebase 실시간 연결 중");
+
+    const unsubscribe = onSnapshot(
+      leagueDocRef,
+      (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data();
+          ignoreNextWrite.current = true;
+          setTeams(data.teams || buildInitialTeams());
+          setHistory(data.history || []);
+          setLastSaved(data.updatedAt ? new Date(data.updatedAt).toLocaleString("ko-KR") : "");
+          setCloudStatus(isAdmin ? "관리자 모드 · Firebase 연결됨" : "학생용 실시간 순위 · Firebase 연결됨");
+        } else {
+          setCloudStatus(isAdmin ? "관리자 모드 · 첫 데이터 생성 전" : "아직 입력된 Firebase 데이터가 없습니다");
+        }
+        setCloudLoaded(true);
+      },
+      (error) => {
+        setCloudStatus("Firebase 연결 실패: Firestore Rules 또는 설정값 확인 필요");
+        console.error(error);
+        setCloudLoaded(true);
       }
-      loadedFromCloud.current = true;
-      setCloudReady(true);
-    });
+    );
+
     return unsubscribe;
-  }, []);
+  }, [isAdmin]);
 
   useEffect(() => {
-    const data = { teams, history, updatedAt: new Date().toISOString() };
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-
-    if (isAdmin && FIREBASE_ENABLED && leagueDocRef && loadedFromCloud.current) {
-      setDoc(leagueDocRef, data, { merge: true }).catch(() => {});
-    }
-
     if (isAdmin) {
-      setSavedNotice(true);
-      const timer = window.setTimeout(() => setSavedNotice(false), 900);
-      return () => window.clearTimeout(timer);
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ teams, history, updatedAt: new Date().toISOString() }));
     }
-  }, [teams, history, isAdmin]);
+
+    if (!isAdmin || !cloudLoaded) return;
+
+    if (ignoreNextWrite.current) {
+      ignoreNextWrite.current = false;
+      return;
+    }
+
+    const data = { teams, history, updatedAt: new Date().toISOString() };
+    setDoc(leagueDocRef, data, { merge: true })
+      .then(() => {
+        setLastSaved(new Date(data.updatedAt).toLocaleString("ko-KR"));
+        setCloudStatus("클라우드 저장 완료");
+      })
+      .catch((error) => {
+        console.error(error);
+        setCloudStatus("클라우드 저장 실패: Firestore Rules 확인 필요");
+      });
+  }, [teams, history, isAdmin, cloudLoaded]);
 
   const resetSets = () => setSets(Array(SET_COUNT).fill(""));
 
   const submitMatch = () => {
-    if (!canSubmit || !isAdmin) return;
+    if (!canSubmit) return;
 
     const loser = matchWinner === teamA ? teamB : teamA;
     const winnerSetWins = matchWinner === teamA ? aSetWins : bSetWins;
@@ -144,27 +169,13 @@ export default function App() {
   const resetAll = () => {
     if (!isAdmin) return;
     if (!window.confirm("모든 경기 기록과 순위를 초기화할까요?")) return;
-    const emptyTeams = buildInitialTeams();
+
     setTeamA("");
     setTeamB("");
     resetSets();
-    setTeams(emptyTeams);
+    setTeams(buildInitialTeams());
     setHistory([]);
-    window.localStorage.removeItem(STORAGE_KEY);
-    if (FIREBASE_ENABLED && leagueDocRef) {
-      setDoc(leagueDocRef, { teams: emptyTeams, history: [], updatedAt: new Date().toISOString() }, { merge: true }).catch(() => {});
-    }
   };
-
-  const storageMessage = isAdmin
-    ? savedNotice
-      ? "클라우드와 브라우저에 자동 저장됨"
-      : cloudReady
-        ? "관리자 입력 모드"
-        : "클라우드 기록 불러오는 중"
-    : cloudReady
-      ? "실시간 순위 보기"
-      : "순위 불러오는 중";
 
   return (
     <main className="page">
@@ -173,8 +184,9 @@ export default function App() {
           <div className="logo">🏸</div>
           <div>
             <h1>6학년 배드민턴 리그전</h1>
-            <p>{isAdmin ? "경기 결과 입력 · 승률순 자동 순위" : "실시간 순위표"}</p>
-            <p className="save-state">{storageMessage}</p>
+            <p>{isAdmin ? "관리자 입력 화면" : "실시간 순위표"}</p>
+            <p className={cloudStatus.includes("실패") ? "status error" : "status"}>{cloudStatus}</p>
+            {lastSaved && <p className="last-saved">마지막 저장: {lastSaved}</p>}
           </div>
         </header>
 
@@ -212,11 +224,18 @@ export default function App() {
                       <div className="set-title">{index + 1}세트 승리반</div>
                       <div className="winner-buttons">
                         {[teamA, teamB].map((name) => (
-                          <button key={name} type="button" className={winner === name ? "selected" : ""} onClick={() => {
-                            const next = [...sets];
-                            next[index] = name;
-                            setSets(next);
-                          }}>{name}</button>
+                          <button
+                            key={name}
+                            type="button"
+                            className={winner === name ? "selected" : ""}
+                            onClick={() => {
+                              const next = [...sets];
+                              next[index] = name;
+                              setSets(next);
+                            }}
+                          >
+                            {name}
+                          </button>
                         ))}
                       </div>
                     </div>
@@ -233,7 +252,7 @@ export default function App() {
           </section>
         )}
 
-        <section className="card ranking-card">
+        <section className="card">
           <div className="section-head">
             <h2>🏆 순위</h2>
             {isAdmin && <button className="reset-button" type="button" onClick={resetAll}>초기화</button>}
@@ -292,9 +311,7 @@ export default function App() {
           </section>
         )}
 
-        {!isAdmin && (
-          <p className="viewer-note">이 화면은 순위 확인용입니다. 경기 결과 입력은 관리자 화면에서만 가능합니다.</p>
-        )}
+        {!isAdmin && <p className="viewer-note">학생용 화면입니다. 경기 결과 입력은 관리자 링크에서만 가능합니다.</p>}
       </section>
     </main>
   );

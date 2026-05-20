@@ -15,7 +15,9 @@ button, select { font: inherit; }
 h1, h2, p { margin: 0; }
 h1 { font-size: 22px; line-height: 1.15; letter-spacing: -0.04em; }
 .header p { margin-top: 4px; color: #64748b; font-size: 13px; }
-.header .save-state { color: #059669; font-weight: 800; font-size: 12px; }
+.status { color: #059669 !important; font-weight: 900; font-size: 12px !important; }
+.status.error { color: #dc2626 !important; }
+.last-saved { color: #64748b !important; font-size: 11px !important; }
 .card { background: rgba(255, 255, 255, 0.95); border: 1px solid rgba(226, 232, 240, 0.9); border-radius: 26px; padding: 16px; margin-bottom: 14px; box-shadow: 0 16px 34px rgba(15, 23, 42, 0.07); }
 .select-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 label span { display: block; margin-bottom: 6px; color: #64748b; font-size: 12px; font-weight: 900; }
