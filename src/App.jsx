@@ -13,10 +13,12 @@ const firebaseConfig = {
 
 const CLASSES = ["가람반", "나리반", "다솜반", "라온반", "마루반", "바름반", "사랑반"];
 const SET_COUNT = 5;
+const LEAGUE_COLLECTION = "leagues";
+const LEAGUE_DOCUMENT = "grade6-badminton";
 
 const firebaseApp = initializeApp(firebaseConfig);
 const db = getFirestore(firebaseApp);
-const leagueDocRef = doc(db, "leagues", "grade6-badminton");
+const leagueDocRef = doc(db, LEAGUE_COLLECTION, LEAGUE_DOCUMENT);
 
 function buildInitialTeams() {
   return CLASSES.map((name) => ({
@@ -75,21 +77,22 @@ function sortTeams(teams) {
   });
 }
 
-function errorToText(error) {
+function firebaseErrorText(error) {
   if (!error) return "";
-  return `${error.code || "unknown"} · ${error.message || String(error)}`;
+  return `${error.code || "Firebase 오류"}: ${error.message || String(error)}`;
 }
 
 export default function App() {
-  const isAdmin = new URLSearchParams(window.location.search).get("admin") === "1";
+  const params = new URLSearchParams(window.location.search);
+  const isAdmin = params.get("admin") === "1";
 
   const [teamA, setTeamA] = useState("");
   const [teamB, setTeamB] = useState("");
   const [sets, setSets] = useState(Array(SET_COUNT).fill(""));
   const [teams, setTeams] = useState(buildInitialTeams());
   const [history, setHistory] = useState([]);
-  const [status, setStatus] = useState("Firebase 연결 중");
-  const [errorText, setErrorText] = useState("");
+  const [status, setStatus] = useState("Firebase 불러오는 중");
+  const [error, setError] = useState("");
   const [lastSaved, setLastSaved] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -105,35 +108,36 @@ export default function App() {
     const unsubscribe = onSnapshot(
       leagueDocRef,
       (snapshot) => {
-        setErrorText("");
+        setError("");
 
         if (snapshot.exists()) {
           const data = snapshot.data();
           setTeams(normalizeTeams(data.teams));
           setHistory(Array.isArray(data.history) ? data.history : []);
           setLastSaved(data.updatedAtText || "");
-          setStatus(isAdmin ? "관리자 모드 · Firebase 실시간 연결됨" : "학생용 실시간 순위 · Firebase 연결됨");
+          setStatus(isAdmin ? "관리자 화면 · Firebase 연동 중" : "학생 화면 · Firebase 연동 중");
         } else {
           setTeams(buildInitialTeams());
           setHistory([]);
           setLastSaved("");
-          setStatus(isAdmin ? "관리자 모드 · 아직 Firebase 문서 없음" : "아직 입력된 경기 결과가 없습니다");
+          setStatus(isAdmin ? "관리자 화면 · 첫 경기 입력 전" : "학생 화면 · 아직 경기 결과 없음");
         }
       },
-      (error) => {
-        setStatus("Firebase 읽기 실패");
-        setErrorText(errorToText(error));
+      (err) => {
+        setStatus("Firebase 연결 실패");
+        setError(firebaseErrorText(err));
       }
     );
 
-    return unsubscribe;
+    return () => unsubscribe();
   }, [isAdmin]);
 
   const resetSets = () => setSets(Array(SET_COUNT).fill(""));
 
-  const writeLeague = async (nextTeams, nextHistory, successMessage) => {
+  async function saveLeague(nextTeams, nextHistory, successMessage) {
     setSaving(true);
-    setErrorText("");
+    setError("");
+
     const nowText = new Date().toLocaleString("ko-KR");
 
     try {
@@ -150,19 +154,15 @@ export default function App() {
 
       setStatus(successMessage);
       setLastSaved(nowText);
-    } catch (error) {
+    } catch (err) {
       setStatus("Firebase 저장 실패");
-      setErrorText(errorToText(error));
+      setError(firebaseErrorText(err));
     } finally {
       setSaving(false);
     }
-  };
+  }
 
-  const testFirebaseWrite = async () => {
-    await writeLeague(teams, history, "Firebase 저장 테스트 성공");
-  };
-
-  const submitMatch = async () => {
+  async function submitMatch() {
     if (!canSubmit) return;
 
     const loser = matchWinner === teamA ? teamB : teamA;
@@ -208,10 +208,10 @@ export default function App() {
     setHistory(nextHistory);
     resetSets();
 
-    await writeLeague(nextTeams, nextHistory, "클라우드 저장 완료");
-  };
+    await saveLeague(nextTeams, nextHistory, "클라우드 저장 완료 · 학생 화면에 반영됨");
+  }
 
-  const resetAll = async () => {
+  async function resetAll() {
     if (!isAdmin) return;
     if (!window.confirm("모든 경기 기록과 순위를 초기화할까요?")) return;
 
@@ -224,8 +224,8 @@ export default function App() {
     setTeams(emptyTeams);
     setHistory(emptyHistory);
 
-    await writeLeague(emptyTeams, emptyHistory, "초기화 완료 · 클라우드 저장 완료");
-  };
+    await saveLeague(emptyTeams, emptyHistory, "초기화 완료 · 학생 화면에 반영됨");
+  }
 
   const statusClass = status.includes("실패") ? "status error" : "status";
 
@@ -242,25 +242,25 @@ export default function App() {
           </div>
         </header>
 
-        {errorText && (
+        {error && (
           <section className="error-box">
             <strong>Firebase 오류</strong>
-            <p>{errorText}</p>
+            <p>{error}</p>
           </section>
         )}
 
         {isAdmin && (
           <section className="card">
-            <button className="test-button" type="button" onClick={testFirebaseWrite} disabled={saving}>
-              {saving ? "확인 중..." : "Firebase 저장 테스트"}
-            </button>
-
             <div className="select-grid">
               <label>
                 <span>반 1</span>
                 <select value={teamA} onChange={(e) => { setTeamA(e.target.value); resetSets(); }}>
                   <option value="">선택</option>
-                  {CLASSES.map((name) => <option key={name} value={name} disabled={name === teamB}>{name}</option>)}
+                  {CLASSES.map((name) => (
+                    <option key={name} value={name} disabled={name === teamB}>
+                      {name}
+                    </option>
+                  ))}
                 </select>
               </label>
 
@@ -268,7 +268,11 @@ export default function App() {
                 <span>반 2</span>
                 <select value={teamB} onChange={(e) => { setTeamB(e.target.value); resetSets(); }}>
                   <option value="">선택</option>
-                  {CLASSES.map((name) => <option key={name} value={name} disabled={name === teamA}>{name}</option>)}
+                  {CLASSES.map((name) => (
+                    <option key={name} value={name} disabled={name === teamA}>
+                      {name}
+                    </option>
+                  ))}
                 </select>
               </label>
             </div>
