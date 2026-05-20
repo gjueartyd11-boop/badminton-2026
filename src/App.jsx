@@ -135,7 +135,7 @@ export default function App() {
           setTeams(normalizeTeams(data.teams));
           setHistory(Array.isArray(data.history) ? data.history : []);
           setLastSaved(data.updatedAtText || "");
-          setStatus(isAdmin ? "관리자 화면 · Firebase 연동 중" : "학생 화면 · 실시간 순위 반영 중");
+          setStatus(isAdmin ? "관리자 화면 · Firebase 연동 중" : "학생 화면 · 경기 결과 실시간 반영 중");
         } else {
           setTeams(buildInitialTeams());
           setHistory([]);
