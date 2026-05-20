@@ -2,15 +2,13 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { initializeApp } from "firebase/app";
 import { doc, getFirestore, onSnapshot, setDoc } from "firebase/firestore";
 
-// Firebase Console에서 복사한 firebaseConfig를 아래 빈칸에 붙여넣으세요.
-// 값이 비어 있으면 같은 기기/같은 브라우저에만 저장됩니다.
 const firebaseConfig = {
-  apiKey: "",
-  authDomain: "",
-  projectId: "",
-  storageBucket: "",
-  messagingSenderId: "",
-  appId: "",
+  apiKey: "AIzaSyD-5zrSaRv2zzgiMx3Lhf7ywzAs0HS5bMw",
+  authDomain: "project-365006779830143485.firebaseapp.com",
+  projectId: "project-365006779830143485",
+  storageBucket: "project-365006779830143485.firebasestorage.app",
+  messagingSenderId: "810628243957",
+  appId: "1:810628243957:web:bb67cebaeb572d3b3780bc"
 };
 
 const CLASSES = ["가람반", "나리반", "다솜반", "라온반", "마루반", "바름반", "사랑반"];
