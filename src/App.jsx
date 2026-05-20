@@ -135,7 +135,7 @@ export default function App() {
           setTeams(normalizeTeams(data.teams));
           setHistory(Array.isArray(data.history) ? data.history : []);
           setLastSaved(data.updatedAtText || "");
-          setStatus(isAdmin ? "관리자 화면 · Firebase 연동 중" : "학생 화면 · Firebase 연동 중");
+          setStatus(isAdmin ? "관리자 화면 · Firebase 연동 중" : "학생 화면 · 실시간 순위 반영 중");
         } else {
           setTeams(buildInitialTeams());
           setHistory([]);
@@ -431,7 +431,7 @@ export default function App() {
           </section>
         )}
 
-        {!isAdmin && <p className="viewer-note">학생용 화면입니다. 경기 결과 입력은 관리자 링크에서만 가능합니다.</p>}
+        {!isAdmin && <p className="viewer-note">학생용 화면입니다. 경기 결과 입력은 관리자만 가능합니다.</p>}
       </section>
     </main>
   );
