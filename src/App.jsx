@@ -1,6 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { initializeApp } from "firebase/app";
-import { doc, getFirestore, onSnapshot, setDoc, serverTimestamp } from "firebase/firestore";
+import {
+  doc,
+  initializeFirestore,
+  onSnapshot,
+  setDoc,
+  serverTimestamp,
+} from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyD-5zrSaRv2zzgiMx3Lhf7ywzAs0HS5bMw",
@@ -13,12 +19,17 @@ const firebaseConfig = {
 
 const CLASSES = ["가람반", "나리반", "다솜반", "라온반", "마루반", "바름반", "사랑반"];
 const SET_COUNT = 5;
-const LEAGUE_COLLECTION = "leagues";
-const LEAGUE_DOCUMENT = "grade6-badminton";
+const WRITE_TIMEOUT_MS = 8000;
 
 const firebaseApp = initializeApp(firebaseConfig);
-const db = getFirestore(firebaseApp);
-const leagueDocRef = doc(db, LEAGUE_COLLECTION, LEAGUE_DOCUMENT);
+
+// 학교망/기관망/일부 모바일 브라우저에서 Firestore 기본 스트리밍 연결이 멈추는 문제를 피하기 위한 설정
+const db = initializeFirestore(firebaseApp, {
+  experimentalForceLongPolling: true,
+  useFetchStreams: false,
+});
+
+const leagueDocRef = doc(db, "leagues", "grade6-badminton");
 
 function buildInitialTeams() {
   return CLASSES.map((name) => ({
@@ -82,6 +93,17 @@ function firebaseErrorText(error) {
   return `${error.code || "Firebase 오류"}: ${error.message || String(error)}`;
 }
 
+function withTimeout(promise, ms) {
+  let timerId;
+  const timer = new Promise((_, reject) => {
+    timerId = window.setTimeout(() => {
+      reject(new Error("Firebase 저장 응답이 8초 안에 오지 않았습니다. Firestore Database 생성 여부, Rules 게시 여부, 네트워크 차단 여부를 확인하세요."));
+    }, ms);
+  });
+
+  return Promise.race([promise, timer]).finally(() => window.clearTimeout(timerId));
+}
+
 export default function App() {
   const params = new URLSearchParams(window.location.search);
   const isAdmin = params.get("admin") === "1";
@@ -141,15 +163,18 @@ export default function App() {
     const nowText = new Date().toLocaleString("ko-KR");
 
     try {
-      await setDoc(
-        leagueDocRef,
-        {
-          teams: nextTeams,
-          history: nextHistory,
-          updatedAtText: nowText,
-          updatedAt: serverTimestamp(),
-        },
-        { merge: false }
+      await withTimeout(
+        setDoc(
+          leagueDocRef,
+          {
+            teams: nextTeams,
+            history: nextHistory,
+            updatedAtText: nowText,
+            updatedAt: serverTimestamp(),
+          },
+          { merge: false }
+        ),
+        WRITE_TIMEOUT_MS
       );
 
       setStatus(successMessage);
