@@ -1,7 +1,7 @@
 {
-  "name": "grade6-badminton-league-final-fixed",
+  "name": "grade6-badminton-firebase-debug-fixed",
   "private": true,
-  "version": "1.3.0",
+  "version": "1.4.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
