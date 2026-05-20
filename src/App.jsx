@@ -20,14 +20,7 @@ const leagueDocRef = FIREBASE_ENABLED
   : null;
 
 function buildInitialTeams() {
-  return CLASSES.map((name) => ({
-    name,
-    games: 0,
-    wins: 0,
-    losses: 0,
-    setWon: 0,
-    setLost: 0,
-  }));
+  return CLASSES.map((name) => ({ name, games: 0, wins: 0, losses: 0, setWon: 0, setLost: 0 }));
 }
 
 function safeLoadLocal() {
@@ -51,11 +44,9 @@ function sortTeams(teams) {
   return [...teams].sort((a, b) => {
     const rateDiff = winRate(b) - winRate(a);
     if (rateDiff !== 0) return rateDiff;
-
     const aSetDiff = a.setWon - a.setLost;
     const bSetDiff = b.setWon - b.setLost;
     if (bSetDiff !== aSetDiff) return bSetDiff - aSetDiff;
-
     if (b.setWon !== a.setWon) return b.setWon - a.setWon;
     if (b.wins !== a.wins) return b.wins - a.wins;
     return a.name.localeCompare(b.name, "ko");
@@ -63,6 +54,8 @@ function sortTeams(teams) {
 }
 
 export default function App() {
+  const params = new URLSearchParams(window.location.search);
+  const isAdmin = params.get("admin") === "1";
   const localData = safeLoadLocal();
 
   const [teamA, setTeamA] = useState("");
@@ -84,7 +77,6 @@ export default function App() {
 
   useEffect(() => {
     if (!FIREBASE_ENABLED || !leagueDocRef) return;
-
     const unsubscribe = onSnapshot(leagueDocRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.data();
@@ -94,7 +86,6 @@ export default function App() {
       loadedFromCloud.current = true;
       setCloudReady(true);
     });
-
     return unsubscribe;
   }, []);
 
@@ -102,35 +93,21 @@ export default function App() {
     const data = { teams, history, updatedAt: new Date().toISOString() };
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 
-    if (FIREBASE_ENABLED && leagueDocRef && loadedFromCloud.current) {
+    if (isAdmin && FIREBASE_ENABLED && leagueDocRef && loadedFromCloud.current) {
       setDoc(leagueDocRef, data, { merge: true }).catch(() => {});
     }
 
-    setSavedNotice(true);
-    const timer = window.setTimeout(() => setSavedNotice(false), 900);
-    return () => window.clearTimeout(timer);
-  }, [teams, history]);
+    if (isAdmin) {
+      setSavedNotice(true);
+      const timer = window.setTimeout(() => setSavedNotice(false), 900);
+      return () => window.clearTimeout(timer);
+    }
+  }, [teams, history, isAdmin]);
 
   const resetSets = () => setSets(Array(SET_COUNT).fill(""));
 
-  const selectTeamA = (value) => {
-    setTeamA(value);
-    resetSets();
-  };
-
-  const selectTeamB = (value) => {
-    setTeamB(value);
-    resetSets();
-  };
-
-  const updateSetWinner = (index, winner) => {
-    const next = [...sets];
-    next[index] = winner;
-    setSets(next);
-  };
-
   const submitMatch = () => {
-    if (!canSubmit) return;
+    if (!canSubmit || !isAdmin) return;
 
     const loser = matchWinner === teamA ? teamB : teamA;
     const winnerSetWins = matchWinner === teamA ? aSetWins : bSetWins;
@@ -139,22 +116,10 @@ export default function App() {
     setTeams((prev) =>
       prev.map((team) => {
         if (team.name === matchWinner) {
-          return {
-            ...team,
-            games: team.games + 1,
-            wins: team.wins + 1,
-            setWon: team.setWon + winnerSetWins,
-            setLost: team.setLost + loserSetWins,
-          };
+          return { ...team, games: team.games + 1, wins: team.wins + 1, setWon: team.setWon + winnerSetWins, setLost: team.setLost + loserSetWins };
         }
         if (team.name === loser) {
-          return {
-            ...team,
-            games: team.games + 1,
-            losses: team.losses + 1,
-            setWon: team.setWon + loserSetWins,
-            setLost: team.setLost + winnerSetWins,
-          };
+          return { ...team, games: team.games + 1, losses: team.losses + 1, setWon: team.setWon + loserSetWins, setLost: team.setLost + winnerSetWins };
         }
         return team;
       })
@@ -177,8 +142,8 @@ export default function App() {
   };
 
   const resetAll = () => {
+    if (!isAdmin) return;
     if (!window.confirm("모든 경기 기록과 순위를 초기화할까요?")) return;
-
     const emptyTeams = buildInitialTeams();
     setTeamA("");
     setTeamB("");
@@ -186,25 +151,20 @@ export default function App() {
     setTeams(emptyTeams);
     setHistory([]);
     window.localStorage.removeItem(STORAGE_KEY);
-
     if (FIREBASE_ENABLED && leagueDocRef) {
-      setDoc(
-        leagueDocRef,
-        { teams: emptyTeams, history: [], updatedAt: new Date().toISOString() },
-        { merge: true }
-      ).catch(() => {});
+      setDoc(leagueDocRef, { teams: emptyTeams, history: [], updatedAt: new Date().toISOString() }, { merge: true }).catch(() => {});
     }
   };
 
-  const storageMessage = savedNotice
-    ? FIREBASE_ENABLED
+  const storageMessage = isAdmin
+    ? savedNotice
       ? "클라우드와 브라우저에 자동 저장됨"
-      : "브라우저에 자동 저장됨"
-    : FIREBASE_ENABLED
-      ? cloudReady
-        ? "여러 기기에서 같은 기록을 볼 수 있습니다"
+      : cloudReady
+        ? "관리자 입력 모드"
         : "클라우드 기록 불러오는 중"
-      : "기록은 이 브라우저에 저장됩니다";
+    : cloudReady
+      ? "실시간 순위 보기"
+      : "순위 불러오는 중";
 
   return (
     <main className="page">
@@ -213,83 +173,80 @@ export default function App() {
           <div className="logo">🏸</div>
           <div>
             <h1>6학년 배드민턴 리그전</h1>
-            <p>5세트 결과 입력 · 승률순 자동 순위</p>
+            <p>{isAdmin ? "경기 결과 입력 · 승률순 자동 순위" : "실시간 순위표"}</p>
             <p className="save-state">{storageMessage}</p>
           </div>
         </header>
 
-        <section className="card">
-          <div className="select-grid">
-            <label>
-              <span>반 1</span>
-              <select value={teamA} onChange={(e) => selectTeamA(e.target.value)}>
-                <option value="">선택</option>
-                {CLASSES.map((name) => (
-                  <option key={name} value={name} disabled={name === teamB}>
-                    {name}
-                  </option>
-                ))}
-              </select>
-            </label>
+        {isAdmin && (
+          <section className="card">
+            <div className="select-grid">
+              <label>
+                <span>반 1</span>
+                <select value={teamA} onChange={(e) => { setTeamA(e.target.value); resetSets(); }}>
+                  <option value="">선택</option>
+                  {CLASSES.map((name) => <option key={name} value={name} disabled={name === teamB}>{name}</option>)}
+                </select>
+              </label>
 
-            <label>
-              <span>반 2</span>
-              <select value={teamB} onChange={(e) => selectTeamB(e.target.value)}>
-                <option value="">선택</option>
-                {CLASSES.map((name) => (
-                  <option key={name} value={name} disabled={name === teamA}>
-                    {name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-
-          {selectedBoth ? (
-            <div className="match-panel">
-              <div className="score-box">
-                <span>현재 세트 스코어</span>
-                <strong>
-                  {teamA} {aSetWins} : {bSetWins} {teamB}
-                </strong>
-                {completeSets && <em>승리: {matchWinner}</em>}
-              </div>
-
-              <div className="set-list">
-                {sets.map((winner, index) => (
-                  <div className="set-card" key={index}>
-                    <div className="set-title">{index + 1}세트 승리반</div>
-                    <div className="winner-buttons">
-                      {[teamA, teamB].map((name) => (
-                        <button
-                          key={name}
-                          type="button"
-                          className={winner === name ? "selected" : ""}
-                          onClick={() => updateSetWinner(index, name)}
-                        >
-                          {name}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <button className="submit-button" type="button" disabled={!canSubmit} onClick={submitMatch}>
-                경기 결과 입력하기
-              </button>
+              <label>
+                <span>반 2</span>
+                <select value={teamB} onChange={(e) => { setTeamB(e.target.value); resetSets(); }}>
+                  <option value="">선택</option>
+                  {CLASSES.map((name) => <option key={name} value={name} disabled={name === teamA}>{name}</option>)}
+                </select>
+              </label>
             </div>
-          ) : (
-            <div className="empty-guide">상단에서 경기할 두 반을 선택하세요.</div>
-          )}
-        </section>
 
-        <section className="card">
+            {selectedBoth ? (
+              <div className="match-panel">
+                <div className="score-box">
+                  <span>현재 세트 스코어</span>
+                  <strong>{teamA} {aSetWins} : {bSetWins} {teamB}</strong>
+                  {completeSets && <em>승리: {matchWinner}</em>}
+                </div>
+
+                <div className="set-list">
+                  {sets.map((winner, index) => (
+                    <div className="set-card" key={index}>
+                      <div className="set-title">{index + 1}세트 승리반</div>
+                      <div className="winner-buttons">
+                        {[teamA, teamB].map((name) => (
+                          <button key={name} type="button" className={winner === name ? "selected" : ""} onClick={() => {
+                            const next = [...sets];
+                            next[index] = name;
+                            setSets(next);
+                          }}>{name}</button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <button className="submit-button" type="button" disabled={!canSubmit} onClick={submitMatch}>
+                  경기 결과 입력하기
+                </button>
+              </div>
+            ) : (
+              <div className="empty-guide">상단에서 경기할 두 반을 선택하세요.</div>
+            )}
+          </section>
+        )}
+
+        <section className="card ranking-card">
           <div className="section-head">
             <h2>🏆 순위</h2>
-            <button className="reset-button" type="button" onClick={resetAll}>
-              초기화
-            </button>
+            {isAdmin && <button className="reset-button" type="button" onClick={resetAll}>초기화</button>}
+          </div>
+
+          <div className="podium">
+            {ranking.slice(0, 3).map((team, index) => (
+              <div className={`podium-item top-${index + 1}`} key={team.name}>
+                <span>{index + 1}위</span>
+                <strong>{team.name}</strong>
+                <em>{winRateText(team)}</em>
+              </div>
+            ))}
           </div>
 
           <div className="table-wrap">
@@ -322,19 +279,21 @@ export default function App() {
 
         {history.length > 0 && (
           <section className="card">
-            <h2>입력된 경기</h2>
+            <h2>{isAdmin ? "입력된 경기" : "최근 경기 결과"}</h2>
             <div className="history-list">
-              {history.map((game) => (
+              {history.slice(0, isAdmin ? history.length : 5).map((game) => (
                 <div className="history-card" key={game.id}>
-                  <strong>
-                    {game.teamA} {game.aSetWins} : {game.bSetWins} {game.teamB}
-                  </strong>
+                  <strong>{game.teamA} {game.aSetWins} : {game.bSetWins} {game.teamB}</strong>
                   <span>승리: {game.winner}</span>
                   <small>{game.createdAt}</small>
                 </div>
               ))}
             </div>
           </section>
+        )}
+
+        {!isAdmin && (
+          <p className="viewer-note">이 화면은 순위 확인용입니다. 경기 결과 입력은 관리자 화면에서만 가능합니다.</p>
         )}
       </section>
     </main>

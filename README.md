@@ -1,30 +1,25 @@
-# 6학년 배드민턴 리그전 웹앱
+# 6학년 배드민턴 리그전 - 관리자/학생 분리 버전
 
-## 사용 방법
+## 링크 사용법
 
-1. GitHub에서 새 저장소를 만듭니다.
-2. 이 폴더 안의 파일 전체를 업로드합니다.
-3. Vercel에서 `Add New → Project`를 누르고 GitHub 저장소를 선택합니다.
-4. `Deploy`를 누르면 링크가 생성됩니다.
+배포 주소가 아래라고 가정하면:
 
-## Firebase 연결 방법
+학생용 순위 보기 링크:
+https://내주소.vercel.app
 
-`src/App.jsx` 파일 상단의 `firebaseConfig` 빈칸에 Firebase Console에서 복사한 설정값을 붙여넣으세요.
+선생님용 입력 링크:
+https://내주소.vercel.app?admin=1
 
-```js
-const firebaseConfig = {
-  apiKey: "...",
-  authDomain: "...",
-  projectId: "...",
-  storageBucket: "...",
-  messagingSenderId: "...",
-  appId: "..."
-};
-```
+학생용 화면에는 경기 결과 입력창이 나오지 않고, 순위와 최근 경기 결과만 표시됩니다.
+선생님이 관리자 링크에서 입력하면 Firebase를 통해 학생용 화면에 자동 반영됩니다.
 
-Firestore Database를 만든 뒤 테스트용 Rules는 아래처럼 설정할 수 있습니다.
+## Firebase
 
-```js
+이 파일에는 사용자가 제공한 firebaseConfig가 이미 들어 있습니다.
+Firestore Database와 Rules 설정이 필요합니다.
+
+테스트용 Rules:
+
 rules_version = '2';
 
 service cloud.firestore {
@@ -34,11 +29,5 @@ service cloud.firestore {
     }
   }
 }
-```
 
-주의: 위 규칙은 테스트용입니다. 공개적으로 오래 사용할 경우 보안 규칙을 제한하는 것이 좋습니다.
-
-## 저장 방식
-
-- Firebase 설정값이 있으면 클라우드 + 브라우저에 저장됩니다.
-- Firebase 설정값이 비어 있으면 같은 기기/같은 브라우저에만 저장됩니다.
+주의: 테스트용 규칙입니다. 공개 운영 시 보안을 강화하는 것이 좋습니다.
