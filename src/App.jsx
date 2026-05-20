@@ -10,9 +10,9 @@ import {
 
 const firebaseConfig = {
   apiKey: "AIzaSyD-5zrSaRv2zzgiMx3Lhf7ywzAs0HS5bMw",
-  authDomain: "project-365006779830143485.firebaseapp.com",
-  projectId: "project-365006779830143485",
-  storageBucket: "project-365006779830143485.firebasestorage.app",
+  authDomain: "gen-lang-client-0225718076.firebaseapp.com",
+  projectId: "gen-lang-client-0225718076",
+  storageBucket: "gen-lang-client-0225718076.firebasestorage.app",
   messagingSenderId: "810628243957",
   appId: "1:810628243957:web:bb67cebaeb572d3b3780bc"
 };
