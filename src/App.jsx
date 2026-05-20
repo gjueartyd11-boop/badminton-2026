@@ -19,7 +19,7 @@ const firebaseConfig = {
 
 const CLASSES = ["가람반", "나리반", "다솜반", "라온반", "마루반", "바름반", "사랑반"];
 const SET_COUNT = 5;
-const ADMIN_PASSWORD = "1234"; // 원하는 관리자 비밀번호로 바꾸세요.
+const ADMIN_PASSWORD = "0926"; // 원하는 관리자 비밀번호로 바꾸세요.
 const WRITE_TIMEOUT_MS = 8000;
 
 const firebaseApp = initializeApp(firebaseConfig);
