@@ -1,0 +1,1 @@
+export default function App(){return <h1>배드민턴 리그 앱</h1>}
