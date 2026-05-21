@@ -76,15 +76,44 @@ function setDiff(team) {
 }
 
 function setScoreText(team) {
-  const games=(team.matchWins||0)+(team.matchDraws||0)+(team.matchLosses||0);
-  const score=team.setWins + (team.setDraws*0.5) - team.setLosses;
-  const avg=games ? score/games : 0;
+  const avg = averageScoreRaw(team);
   return Number.isInteger(avg) ? String(avg) : avg.toFixed(2);
 }
 
 function gameCount(team) {
   return team.matchWins + team.matchDraws + team.matchLosses;
 }
+
+function setScoreRaw(team) {
+  return team.setWins + team.setDraws * 0.5 - team.setLosses;
+}
+
+function averageScoreRaw(team) {
+  const games = gameCount(team);
+  return games ? setScoreRaw(team) / games : 0;
+}
+
+function remainingGames(team) {
+  return Math.max(0, CLASSES.length - 1 - gameCount(team));
+}
+
+function neededSetDiff(team, leader) {
+  if (!leader || team.name === leader.name) return "-";
+  const leaderAverage = averageScoreRaw(leader);
+  const myAverage = averageScoreRaw(team);
+  if (myAverage >= leaderAverage) return "-";
+
+  const remain = remainingGames(team);
+  if (remain <= 0) return "종료";
+
+  const currentScore = setScoreRaw(team);
+  const neededTotalScore = leaderAverage * (gameCount(team) + remain);
+  const neededExtraScore = neededTotalScore - currentScore;
+
+  if (neededExtraScore <= 0) return "-";
+  return `+${Math.ceil(neededExtraScore)}`;
+}
+
 
 function sortTeams(teams) {
   return [...teams].sort((a, b) => {
@@ -149,6 +178,7 @@ export default function App() {
         : "무승부"
     : "";
   const ranking = useMemo(() => sortTeams(teams), [teams]);
+  const leader = ranking[0];
   const canEdit = isAdmin && adminUnlocked;
   const canSubmit = canEdit && selectedBoth && completeSets && !saving;
 
@@ -430,7 +460,7 @@ export default function App() {
                   <th>무</th>
                   <th>패</th>
                   <th>승률</th>
-                  <th>평균승점</th>
+                  <th>평균승점</th><th>필요세트차</th>
                 </tr>
               </thead>
               <tbody>
@@ -443,14 +473,18 @@ export default function App() {
                     <td>{team.setDraws}</td>
                     <td>{team.setLosses}</td>
                     <td className="set-diff">{winRateText(team)}</td>
-                    <td>{setScoreText(team)}</td>
+                    <td>{setScoreText(team)}</td><td>{neededSetDiff(team, leader)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
 
-          <p className="rule-note">승률 = (세트승 + 세트무×0.5) ÷ 전체세트 / 평균승점 = (세트승 + 세트무×0.5 - 세트패) ÷ 경기수</p>
+          <div className="rule-note rule-note-lines">
+            <p>승률 = (세트승 + 세트무×0.5) ÷ 전체세트</p>
+            <p>평균승점 = (세트승 + 세트무×0.5 - 세트패) ÷ 경기수</p>
+            <p>필요세트차 = 남은 경기에서 1위 평균승점까지 필요한 세트 우위</p>
+          </div>
         </section>
 
         {history.length > 0 && (
