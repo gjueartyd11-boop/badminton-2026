@@ -70,3 +70,15 @@ th:nth-child(2), td:nth-child(2) { text-align: left; }
   table { font-size: 12px; }
   .podium-item strong { font-size: 15px; }
 }
+
+.winner-buttons.three {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+.winner-buttons.three button {
+  font-size: 13px;
+}
+@media (max-width: 360px) {
+  .winner-buttons.three {
+    grid-template-columns: 1fr;
+  }
+}
