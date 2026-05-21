@@ -19,7 +19,7 @@ const firebaseConfig = {
 
 const CLASSES = ["가람반", "나리반", "다솜반", "라온반", "마루반", "바름반", "사랑반"];
 const SET_COUNT = 5;
-const ADMIN_PASSWORD = "0926"; // 원하는 관리자 비밀번호로 바꾸세요.
+const ADMIN_PASSWORD = "1234"; // 원하는 관리자 비밀번호로 바꾸세요.
 const WRITE_TIMEOUT_MS = 8000;
 
 const firebaseApp = initializeApp(firebaseConfig);
@@ -33,10 +33,8 @@ function buildInitialTeams() {
   return CLASSES.map((name) => ({
     name,
     setWins: 0,
-    setDraws: 0,
     setLosses: 0,
     matchWins: 0,
-    matchDraws: 0,
     matchLosses: 0,
   }));
 }
@@ -48,22 +46,20 @@ function normalizeTeams(teams) {
     return {
       name,
       setWins: Number(old.setWins ?? old.wins ?? old.setWon ?? 0),
-      setDraws: Number(old.setDraws ?? 0),
       setLosses: Number(old.setLosses ?? old.losses ?? old.setLost ?? 0),
       matchWins: Number(old.matchWins ?? 0),
-      matchDraws: Number(old.matchDraws ?? old.draws ?? 0),
       matchLosses: Number(old.matchLosses ?? 0),
     };
   });
 }
 
 function totalSets(team) {
-  return team.setWins + team.setDraws + team.setLosses;
+  return team.setWins + team.setLosses;
 }
 
 function winRate(team) {
   const total = totalSets(team);
-  return total ? (team.setWins + team.setDraws * 0.5) / total : 0;
+  return total ? team.setWins / total : 0;
 }
 
 function winRateText(team) {
@@ -75,35 +71,9 @@ function setDiff(team) {
   return team.setWins - team.setLosses;
 }
 
-function gameCount(team) {
-  return team.matchWins + team.matchDraws + team.matchLosses;
-}
-
-function gameBack(team, leader) {
-  if (!leader || team.name === leader.name) return "-";
-  const gb = ((leader.matchWins - team.matchWins) + (team.matchLosses - leader.matchLosses)) / 2;
-  return gb === 0 ? "-" : Number.isInteger(gb) ? String(gb) : gb.toFixed(1);
-}
-
-function getStreak(teamName, history) {
-  let streakType = "";
-  let count = 0;
-
-  for (const game of history) {
-    if (game.teamA !== teamName && game.teamB !== teamName) continue;
-    const result = game.winner === "무승부" ? "무" : game.winner === teamName ? "승" : "패";
-
-    if (!streakType) {
-      streakType = result;
-      count = 1;
-    } else if (result === streakType) {
-      count += 1;
-    } else {
-      break;
-    }
-  }
-
-  return count ? `${count}${streakType}` : "-";
+function setScoreText(team) {
+  const score = team.setWins + (team.setDraws * 0.5) - team.setLosses;
+  return Number.isInteger(score) ? String(score) : score.toFixed(1);
 }
 
 function sortTeams(teams) {
@@ -154,18 +124,8 @@ export default function App() {
   const completeSets = sets.every(Boolean);
   const aSetWins = sets.filter((winner) => winner === teamA).length;
   const bSetWins = sets.filter((winner) => winner === teamB).length;
-  const setDraws = sets.filter((winner) => winner === "무승부").length;
-  const aSetScore = aSetWins + setDraws * 0.5;
-  const bSetScore = bSetWins + setDraws * 0.5;
-  const matchWinner = selectedBoth && completeSets
-    ? aSetScore > bSetScore
-      ? teamA
-      : aSetScore < bSetScore
-        ? teamB
-        : "무승부"
-    : "";
+  const matchWinner = selectedBoth && completeSets ? (aSetWins > bSetWins ? teamA : teamB) : "";
   const ranking = useMemo(() => sortTeams(teams), [teams]);
-  const leader = ranking[0];
   const canEdit = isAdmin && adminUnlocked;
   const canSubmit = canEdit && selectedBoth && completeSets && aSetWins !== bSetWins && !saving;
 
@@ -180,7 +140,7 @@ export default function App() {
           setTeams(normalizeTeams(data.teams));
           setHistory(Array.isArray(data.history) ? data.history : []);
           setLastSaved(data.updatedAtText || "");
-          setStatus(isAdmin ? "관리자 화면 · Firebase 연동 중" : "경기 결과 실시간 반영 중");
+          setStatus(isAdmin ? "관리자 화면 · Firebase 연동 중" : "학생 화면 · Firebase 연동 중");
         } else {
           setTeams(buildInitialTeams());
           setHistory([]);
@@ -233,28 +193,26 @@ export default function App() {
   async function submitMatch() {
     if (!canSubmit) return;
 
+    const loser = matchWinner === teamA ? teamB : teamA;
+    const winnerSetWins = matchWinner === teamA ? aSetWins : bSetWins;
+    const loserSetWins = matchWinner === teamA ? bSetWins : aSetWins;
+
     const nextTeams = teams.map((team) => {
-      if (team.name === teamA) {
+      if (team.name === matchWinner) {
         return {
           ...team,
-          setWins: team.setWins + aSetWins,
-          setDraws: team.setDraws + setDraws,
-          setLosses: team.setLosses + bSetWins,
-          matchWins: team.matchWins + (matchWinner === teamA ? 1 : 0),
-          matchDraws: team.matchDraws + (matchWinner === "무승부" ? 1 : 0),
-          matchLosses: team.matchLosses + (matchWinner === teamB ? 1 : 0),
+          setWins: team.setWins + winnerSetWins,
+          setLosses: team.setLosses + loserSetWins,
+          matchWins: team.matchWins + 1,
         };
       }
 
-      if (team.name === teamB) {
+      if (team.name === loser) {
         return {
           ...team,
-          setWins: team.setWins + bSetWins,
-          setDraws: team.setDraws + setDraws,
-          setLosses: team.setLosses + aSetWins,
-          matchWins: team.matchWins + (matchWinner === teamB ? 1 : 0),
-          matchDraws: team.matchDraws + (matchWinner === "무승부" ? 1 : 0),
-          matchLosses: team.matchLosses + (matchWinner === teamA ? 1 : 0),
+          setWins: team.setWins + loserSetWins,
+          setLosses: team.setLosses + winnerSetWins,
+          matchLosses: team.matchLosses + 1,
         };
       }
 
@@ -268,9 +226,6 @@ export default function App() {
         teamB,
         aSetWins,
         bSetWins,
-        setDraws,
-        aSetScore,
-        bSetScore,
         winner: matchWinner,
         createdAt: new Date().toLocaleString("ko-KR"),
       },
@@ -382,16 +337,16 @@ export default function App() {
               <div className="match-panel">
                 <div className="score-box">
                   <span>현재 세트 스코어</span>
-                  <strong>{teamA} {aSetScore} : {bSetScore} {teamB}</strong>
-                  {completeSets && <em>{matchWinner === "무승부" ? "경기 무승부" : `승리: ${matchWinner}`}</em>}
+                  <strong>{teamA} {aSetWins} : {bSetWins} {teamB}</strong>
+                  {completeSets && <em>승리: {matchWinner}</em>}
                 </div>
 
                 <div className="set-list">
                   {sets.map((winner, index) => (
                     <div className="set-card" key={index}>
                       <div className="set-title">{index + 1}세트 승리반</div>
-                      <div className="winner-buttons three">
-                        {[teamA, "무승부", teamB].map((name) => (
+                      <div className="winner-buttons">
+                        {[teamA, teamB].map((name) => (
                           <button
                             key={name}
                             type="button"
@@ -402,7 +357,7 @@ export default function App() {
                               setSets(next);
                             }}
                           >
-                            {name === "무승부" ? "무승부" : `${name} 승`}
+                            {name}
                           </button>
                         ))}
                       </div>
@@ -442,13 +397,9 @@ export default function App() {
                 <tr>
                   <th>순위</th>
                   <th>반</th>
-                  <th>경기</th>
-                  <th>승</th>
-                  <th>무</th>
-                  <th>패</th>
-                  <th>승률</th>
-                  <th>게임차</th>
-                  <th>연속</th>
+                  <th>승률</th><th>승점</th>
+                  <th>세트승</th>
+                  <th>세트패</th>
                   <th>세트득실</th>
                 </tr>
               </thead>
@@ -457,21 +408,17 @@ export default function App() {
                   <tr key={team.name}>
                     <td className="rank">{index + 1}</td>
                     <td className="team-name">{team.name}</td>
-                    <td>{gameCount(team)}</td>
-                    <td>{team.matchWins}</td>
-                    <td>{team.matchDraws}</td>
-                    <td>{team.matchLosses}</td>
-                    <td className="set-diff">{winRateText(team)}</td>
-                    <td>{gameBack(team, leader)}</td>
-                    <td>{getStreak(team.name, history)}</td>
-                    <td>{setDiff(team)}</td>
+                    <td>{winRateText(team)}</td>
+                    <td>{team.setWins}</td>
+                    <td>{team.setLosses}</td>
+                    <td className="set-diff">{setDiff(team)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
 
-          <p className="rule-note">승률 = (세트승 + 세트무×0.5) ÷ 전체세트</p>
+          <p className="rule-note">승률 = (세트승 + 세트무×0.5) ÷ 전체세트 / 승점 = 세트승 + 세트무×0.5 - 세트패</p>
         </section>
 
         {history.length > 0 && (
@@ -480,8 +427,8 @@ export default function App() {
             <div className="history-list">
               {history.slice(0, isAdmin ? history.length : 5).map((game) => (
                 <div className="history-card" key={game.id}>
-                  <strong>{game.teamA} {game.aSetScore ?? game.aSetWins} : {game.bSetScore ?? game.bSetWins} {game.teamB}</strong>
-                  <span>{game.winner === "무승부" ? "경기 무승부" : `승리: ${game.winner}`}</span>
+                  <strong>{game.teamA} {game.aSetWins} : {game.bSetWins} {game.teamB}</strong>
+                  <span>승리: {game.winner}</span>
                   <small>{game.createdAt}</small>
                 </div>
               ))}
@@ -489,7 +436,7 @@ export default function App() {
           </section>
         )}
 
-        {!isAdmin && <p className="viewer-note">학생용 화면입니다. 경기 결과 입력은 관리자만 가능합니다.</p>}
+        {!isAdmin && <p className="viewer-note">학생용 화면입니다. 경기 결과 입력은 관리자 링크에서만 가능합니다.</p>}
       </section>
     </main>
   );

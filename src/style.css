@@ -51,8 +51,8 @@ h2 { font-size: 19px; letter-spacing: -0.03em; }
 .top-1 { background: #fef3c7; }
 .top-2 { background: #e2e8f0; }
 .top-3 { background: #ffedd5; }
-.table-wrap { overflow: auto; border: 1px solid #e2e8f0; border-radius: 20px; background: #fff; }
-table { min-width: 560px; width: 100%; border-collapse: collapse; font-size: 13px; }
+.table-wrap { overflow: hidden; border: 1px solid #e2e8f0; border-radius: 20px; background: #fff; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
 th { padding: 10px 4px; background: #f1f5f9; color: #64748b; font-size: 12px; font-weight: 900; }
 td { padding: 13px 4px; border-top: 1px solid #f1f5f9; text-align: center; }
 th:nth-child(2), td:nth-child(2) { text-align: left; }
@@ -69,16 +69,4 @@ th:nth-child(2), td:nth-child(2) { text-align: left; }
   .score-box strong { font-size: 21px; }
   table { font-size: 12px; }
   .podium-item strong { font-size: 15px; }
-}
-
-.winner-buttons.three {
-  grid-template-columns: 1fr 1fr 1fr;
-}
-.winner-buttons.three button {
-  font-size: 13px;
-}
-@media (max-width: 360px) {
-  .winner-buttons.three {
-    grid-template-columns: 1fr;
-  }
 }
