@@ -113,3 +113,13 @@ table th:nth-child(9), table td:nth-child(9) { width: 15%; }
   td { padding: 8px 1px; }
   .team-name { font-size: 9.5px; }
 }
+
+/* eight-column-rank-table-override */
+table th:nth-child(1), table td:nth-child(1) { width: 9%; }
+table th:nth-child(2), table td:nth-child(2) { width: 17%; }
+table th:nth-child(3), table td:nth-child(3) { width: 10%; }
+table th:nth-child(4), table td:nth-child(4),
+table th:nth-child(5), table td:nth-child(5),
+table th:nth-child(6), table td:nth-child(6) { width: 9%; }
+table th:nth-child(7), table td:nth-child(7) { width: 17%; }
+table th:nth-child(8), table td:nth-child(8) { width: 20%; }

@@ -120,8 +120,8 @@ function sortTeams(teams) {
     const rateDiff = winRate(b) - winRate(a);
     if (rateDiff !== 0) return rateDiff;
 
-    const scoreDiff = (b.setWins + b.setDraws * 0.5 - b.setLosses) - (a.setWins + a.setDraws * 0.5 - a.setLosses);
-    if (scoreDiff !== 0) return scoreDiff;
+    const avgPointDiff = averageScoreRaw(b) - averageScoreRaw(a);
+    if (avgPointDiff !== 0) return avgPointDiff;
 
     const diff = setDiff(b) - setDiff(a);
     if (diff !== 0) return diff;
@@ -460,7 +460,7 @@ export default function App() {
                   <th>무</th>
                   <th>패</th>
                   <th>승률</th>
-                  <th>평균승점</th><th>필요세트차</th>
+                  <th>평균승점</th>
                 </tr>
               </thead>
               <tbody>
@@ -473,7 +473,7 @@ export default function App() {
                     <td>{team.setDraws}</td>
                     <td>{team.setLosses}</td>
                     <td className="set-diff">{winRateText(team)}</td>
-                    <td>{setScoreText(team)}</td><td>{neededSetDiff(team, leader)}</td>
+                    <td>{setScoreText(team)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -483,7 +483,6 @@ export default function App() {
           <div className="rule-note rule-note-lines">
             <p>승률 = (세트승 + 세트무×0.5) ÷ 전체세트</p>
             <p>평균승점 = (세트승 + 세트무×0.5 - 세트패) ÷ 경기수</p>
-            <p>필요세트차 = 남은 경기에서 1위 평균승점까지 필요한 세트 우위</p>
           </div>
         </section>
 
