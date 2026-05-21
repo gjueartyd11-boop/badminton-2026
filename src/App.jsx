@@ -471,7 +471,7 @@ export default function App() {
             </table>
           </div>
 
-          <p className="rule-note">KBO 스타일 표시 / 승률 = (세트승 + 세트무×0.5) ÷ 전체세트</p>
+          <p className="rule-note">승률 = (세트승 + 세트무×0.5) ÷ 전체세트</p>
         </section>
 
         {history.length > 0 && (
