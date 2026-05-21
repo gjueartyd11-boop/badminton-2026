@@ -71,6 +71,37 @@ function setDiff(team) {
   return team.setWins - team.setLosses;
 }
 
+function gameCount(team) {
+  return team.matchWins + team.matchLosses;
+}
+
+function gameBack(team, leader) {
+  if (!leader || team.name === leader.name) return "-";
+  const gb = ((leader.matchWins - team.matchWins) + (team.matchLosses - leader.matchLosses)) / 2;
+  return gb === 0 ? "-" : Number.isInteger(gb) ? String(gb) : gb.toFixed(1);
+}
+
+function getStreak(teamName, history) {
+  let streakType = "";
+  let count = 0;
+
+  for (const game of history) {
+    if (game.teamA !== teamName && game.teamB !== teamName) continue;
+    const result = game.winner === teamName ? "승" : "패";
+
+    if (!streakType) {
+      streakType = result;
+      count = 1;
+    } else if (result === streakType) {
+      count += 1;
+    } else {
+      break;
+    }
+  }
+
+  return count ? `${count}${streakType}` : "-";
+}
+
 function sortTeams(teams) {
   return [...teams].sort((a, b) => {
     const rateDiff = winRate(b) - winRate(a);
@@ -121,6 +152,7 @@ export default function App() {
   const bSetWins = sets.filter((winner) => winner === teamB).length;
   const matchWinner = selectedBoth && completeSets ? (aSetWins > bSetWins ? teamA : teamB) : "";
   const ranking = useMemo(() => sortTeams(teams), [teams]);
+  const leader = ranking[0];
   const canEdit = isAdmin && adminUnlocked;
   const canSubmit = canEdit && selectedBoth && completeSets && aSetWins !== bSetWins && !saving;
 
@@ -392,9 +424,13 @@ export default function App() {
                 <tr>
                   <th>순위</th>
                   <th>반</th>
+                  <th>경기</th>
+                  <th>승</th>
+                  <th>무</th>
+                  <th>패</th>
                   <th>승률</th>
-                  <th>세트승</th>
-                  <th>세트패</th>
+                  <th>게임차</th>
+                  <th>연속</th>
                   <th>세트득실</th>
                 </tr>
               </thead>
@@ -403,17 +439,21 @@ export default function App() {
                   <tr key={team.name}>
                     <td className="rank">{index + 1}</td>
                     <td className="team-name">{team.name}</td>
-                    <td>{winRateText(team)}</td>
-                    <td>{team.setWins}</td>
-                    <td>{team.setLosses}</td>
-                    <td className="set-diff">{setDiff(team)}</td>
+                    <td>{gameCount(team)}</td>
+                    <td>{team.matchWins}</td>
+                    <td>0</td>
+                    <td>{team.matchLosses}</td>
+                    <td className="set-diff">{winRateText(team)}</td>
+                    <td>{gameBack(team, leader)}</td>
+                    <td>{getStreak(team.name, history)}</td>
+                    <td>{setDiff(team)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
 
-          <p className="rule-note">승률 = 세트승 ÷ (세트승 + 세트패)</p>
+          <p className="rule-note">KBO 스타일 표시 / 승률 = 세트승 ÷ (세트승 + 세트패)</p>
         </section>
 
         {history.length > 0 && (
