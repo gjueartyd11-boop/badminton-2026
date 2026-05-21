@@ -76,8 +76,10 @@ function setDiff(team) {
 }
 
 function setScoreText(team) {
-  const score = team.setWins + (team.setDraws * 0.5) - team.setLosses;
-  return Number.isInteger(score) ? String(score) : score.toFixed(1);
+  const games=(team.matchWins||0)+(team.matchDraws||0)+(team.matchLosses||0);
+  const score=team.setWins + (team.setDraws*0.5) - team.setLosses;
+  const avg=games ? score/games : 0;
+  return Number.isInteger(avg) ? String(avg) : avg.toFixed(2);
 }
 
 function gameCount(team) {
@@ -428,7 +430,7 @@ export default function App() {
                   <th>무</th>
                   <th>패</th>
                   <th>승률</th>
-                  <th>승점</th>
+                  <th>평균승점</th>
                 </tr>
               </thead>
               <tbody>
@@ -448,7 +450,7 @@ export default function App() {
             </table>
           </div>
 
-          <p className="rule-note">승률 = (세트승 + 세트무×0.5) ÷ 전체세트 / 승점 = 세트승 + 세트무×0.5 - 세트패</p>
+          <p className="rule-note">승률 = (세트승 + 세트무×0.5) ÷ 전체세트 / 평균승점 = (세트승 + 세트무×0.5 - 세트패) ÷ 경기수</p>
         </section>
 
         {history.length > 0 && (
