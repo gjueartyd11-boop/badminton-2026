@@ -56,7 +56,11 @@ function winRateText(team) {
   return decidedGames ? winRate(team).toFixed(3).replace(/^0/, "") : "-";
 }
 function setPointDiff(team) { return team.setPointsFor - team.setPointsAgainst; }
-function setPointText(value) { return Number.isInteger(value) ? String(value) : value.toFixed(1); }
+function setPointText(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return "-";
+  return Number.isInteger(number) ? String(number) : number.toFixed(1);
+}
 
 function sortTeams(teams) {
   return [...teams].sort((a, b) => {
@@ -80,8 +84,12 @@ function getStreak(teamName, history) {
   let count = 0;
   for (const game of history) {
     let result = "";
-    if (game.teamA === teamName) result = game.resultA || "";
-    else if (game.teamB === teamName) result = game.resultB || "";
+    if (game.teamA === teamName) {
+      result = game.resultA || (game.winner ? (game.winner === teamName ? "승" : "패") : "");
+    }
+    else if (game.teamB === teamName) {
+      result = game.resultB || (game.winner ? (game.winner === teamName ? "승" : "패") : "");
+    }
     else continue;
     if (!result) continue;
     if (!streakType) { streakType = result; count = 1; }
@@ -89,6 +97,23 @@ function getStreak(teamName, history) {
     else break;
   }
   return count ? `${count}${streakType}` : "-";
+}
+
+function historyScoreText(game) {
+  if (game.aSetPoints !== undefined && game.bSetPoints !== undefined) {
+    return `${setPointText(game.aSetPoints)} : ${setPointText(game.bSetPoints)}`;
+  }
+  if (game.aSetWins !== undefined && game.bSetWins !== undefined) {
+    return `${game.aSetWins} : ${game.bSetWins}`;
+  }
+  if (game.scoreA !== undefined && game.scoreB !== undefined) {
+    return `${game.scoreA} : ${game.scoreB}`;
+  }
+  return "- : -";
+}
+
+function historyResultText(game) {
+  return game.result || game.winner ? (game.result || `승리: ${game.winner}`) : "결과 기록";
 }
 
 function firebaseErrorText(error) {
@@ -296,7 +321,7 @@ export default function App() {
           <p className="rule-note">승률 = 승 ÷ (승+패), 무승부 제외 / 세트 무승부는 양 팀 0.5점</p>
         </section>
 
-        {history.length > 0 && <section className="card"><h2>{isAdmin ? "입력된 경기" : "최근 경기 결과"}</h2><div className="history-list">{history.slice(0, isAdmin ? history.length : 5).map((game) => <div className="history-card" key={game.id}><strong>{game.teamA} {setPointText(game.aSetPoints)} : {setPointText(game.bSetPoints)} {game.teamB}</strong><span>{game.result}</span><small>{game.createdAt}</small></div>)}</div></section>}
+        {history.length > 0 && <section className="card"><h2>{isAdmin ? "입력된 경기" : "최근 경기 결과"}</h2><div className="history-list">{history.slice(0, isAdmin ? history.length : 5).map((game) => <div className="history-card" key={game.id}><strong>{game.teamA} {historyScoreText(game)} {game.teamB}</strong><span>{historyResultText(game)}</span><small>{game.createdAt}</small></div>)}</div></section>}
         {!isAdmin && <p className="viewer-note">학생용 화면입니다. 경기 결과 입력은 관리자만 가능합니다.</p>}
       </section>
     </main>
