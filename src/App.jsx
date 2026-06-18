@@ -131,6 +131,23 @@ function sortTeams(teams) {
   });
 }
 
+function buildRankLookup(sortedTeams) {
+  const rankByName = new Map();
+  let previousRate = null;
+  let currentRank = 0;
+
+  sortedTeams.forEach((team, index) => {
+    const rate = winRate(team);
+    if (previousRate === null || rate !== previousRate) {
+      currentRank = index + 1;
+      previousRate = rate;
+    }
+    rankByName.set(team.name, currentRank);
+  });
+
+  return rankByName;
+}
+
 function firebaseErrorText(error) {
   if (!error) return "";
   return `${error.code || "Firebase 오류"}: ${error.message || String(error)}`;
@@ -178,6 +195,7 @@ export default function App() {
         : "무승부"
     : "";
   const ranking = useMemo(() => sortTeams(teams), [teams]);
+  const rankLookup = useMemo(() => buildRankLookup(ranking), [ranking]);
   const leader = ranking[0];
   const canEdit = isAdmin && adminUnlocked;
   const canSubmit = canEdit && selectedBoth && completeSets && !saving;
@@ -440,13 +458,16 @@ export default function App() {
           </div>
 
           <div className="podium">
-            {ranking.slice(0, 3).map((team, index) => (
-              <div className={`podium-item top-${index + 1}`} key={team.name}>
-                <span>{index + 1}위</span>
+            {ranking.filter((team) => (rankLookup.get(team.name) || 1) <= 3).map((team) => {
+              const rank = rankLookup.get(team.name) || 1;
+              return (
+              <div className={`podium-item top-${Math.min(rank, 3)}`} key={team.name}>
+                <span>{rank}위</span>
                 <strong>{team.name}</strong>
                 <em>{winRateText(team)}</em>
               </div>
-            ))}
+              );
+            })}
           </div>
 
           <div className="table-wrap">
@@ -464,9 +485,9 @@ export default function App() {
                 </tr>
               </thead>
               <tbody>
-                {ranking.map((team, index) => (
+                {ranking.map((team) => (
                   <tr key={team.name}>
-                    <td className="rank">{index + 1}</td>
+                    <td className="rank">{rankLookup.get(team.name) || 1}</td>
                     <td className="team-name">{team.name}</td>
                     <td>{gameCount(team)}</td>
                     <td>{team.setWins}</td>
