@@ -115,24 +115,11 @@ function neededSetDiff(team, leader) {
 }
 
 
-function rankScore(team) {
-  // 화면에 표시되는 승률 기준으로 공동 순위를 판단합니다.
-  // 경기 결과가 없는 반은 승률 0으로 계산되어, 전체 미입력 시 모두 1위가 됩니다.
-  return Number(winRate(team).toFixed(3));
-}
-
-function displayRank(sortedTeams, index) {
-  const myScore = rankScore(sortedTeams[index]);
-  // 경쟁 순위 방식: 1, 1, 1 다음은 4 / 1, 2, 2 다음은 4
-  return sortedTeams.filter((team) => rankScore(team) > myScore).length + 1;
-}
-
 function sortTeams(teams) {
   return [...teams].sort((a, b) => {
-    const rateDiff = rankScore(b) - rankScore(a);
+    const rateDiff = winRate(b) - winRate(a);
     if (rateDiff !== 0) return rateDiff;
 
-    // 승률이 같은 반은 같은 순위입니다. 아래 기준은 같은 순위 안에서 보기 좋게 정렬만 합니다.
     const avgPointDiff = averageScoreRaw(b) - averageScoreRaw(a);
     if (avgPointDiff !== 0) return avgPointDiff;
 
@@ -141,6 +128,30 @@ function sortTeams(teams) {
 
     if (b.setWins !== a.setWins) return b.setWins - a.setWins;
     return a.name.localeCompare(b.name, "ko");
+  });
+}
+
+
+function rankValue(team) {
+  return winRate(team);
+}
+
+function isSameRank(a, b) {
+  return Math.abs(rankValue(a) - rankValue(b)) < 0.0000001;
+}
+
+function addCompetitionRanks(sortedTeams) {
+  let currentRank = 1;
+
+  return sortedTeams.map((team, index) => {
+    if (index > 0 && !isSameRank(team, sortedTeams[index - 1])) {
+      currentRank = index + 1;
+    }
+
+    return {
+      ...team,
+      displayRank: currentRank,
+    };
   });
 }
 
@@ -190,7 +201,8 @@ export default function App() {
         ? teamB
         : "무승부"
     : "";
-  const ranking = useMemo(() => sortTeams(teams), [teams]);
+  const sortedRanking = useMemo(() => sortTeams(teams), [teams]);
+  const ranking = useMemo(() => addCompetitionRanks(sortedRanking), [sortedRanking]);
   const leader = ranking[0];
   const canEdit = isAdmin && adminUnlocked;
   const canSubmit = canEdit && selectedBoth && completeSets && !saving;
@@ -453,16 +465,13 @@ export default function App() {
           </div>
 
           <div className="podium">
-            {ranking.filter((team, index) => displayRank(ranking, index) <= 3).map((team, index) => {
-              const rank = displayRank(ranking, index);
-              return (
-              <div className={`podium-item top-${Math.min(rank, 3)}`} key={team.name}>
-                <span>{rank}위</span>
+            {ranking.slice(0, 3).map((team, index) => (
+              <div className={`podium-item top-${index + 1}`} key={team.name}>
+                <span>{team.displayRank}위</span>
                 <strong>{team.name}</strong>
                 <em>{winRateText(team)}</em>
               </div>
-              );
-            })}
+            ))}
           </div>
 
           <div className="table-wrap">
@@ -480,9 +489,9 @@ export default function App() {
                 </tr>
               </thead>
               <tbody>
-                {ranking.map((team, index) => (
+                {ranking.map((team) => (
                   <tr key={team.name}>
-                    <td className="rank">{displayRank(ranking, index)}</td>
+                    <td className="rank">{team.displayRank}</td>
                     <td className="team-name">{team.name}</td>
                     <td>{gameCount(team)}</td>
                     <td>{team.setWins}</td>
