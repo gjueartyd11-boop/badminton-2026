@@ -93,28 +93,6 @@ function averageScoreRaw(team) {
   return games ? setScoreRaw(team) / games : 0;
 }
 
-function remainingGames(team) {
-  return Math.max(0, CLASSES.length - 1 - gameCount(team));
-}
-
-function neededSetDiff(team, leader) {
-  if (!leader || team.name === leader.name) return "-";
-  const leaderAverage = averageScoreRaw(leader);
-  const myAverage = averageScoreRaw(team);
-  if (myAverage >= leaderAverage) return "-";
-
-  const remain = remainingGames(team);
-  if (remain <= 0) return "종료";
-
-  const currentScore = setScoreRaw(team);
-  const neededTotalScore = leaderAverage * (gameCount(team) + remain);
-  const neededExtraScore = neededTotalScore - currentScore;
-
-  if (neededExtraScore <= 0) return "-";
-  return `+${Math.ceil(neededExtraScore)}`;
-}
-
-
 function sortTeams(teams) {
   return [...teams].sort((a, b) => {
     const rateDiff = winRate(b) - winRate(a);
@@ -128,30 +106,6 @@ function sortTeams(teams) {
 
     if (b.setWins !== a.setWins) return b.setWins - a.setWins;
     return a.name.localeCompare(b.name, "ko");
-  });
-}
-
-
-function rankValue(team) {
-  return winRate(team);
-}
-
-function isSameRank(a, b) {
-  return Math.abs(rankValue(a) - rankValue(b)) < 0.0000001;
-}
-
-function addCompetitionRanks(sortedTeams) {
-  let currentRank = 1;
-
-  return sortedTeams.map((team, index) => {
-    if (index > 0 && !isSameRank(team, sortedTeams[index - 1])) {
-      currentRank = index + 1;
-    }
-
-    return {
-      ...team,
-      displayRank: currentRank,
-    };
   });
 }
 
@@ -201,9 +155,41 @@ export default function App() {
         ? teamB
         : "무승부"
     : "";
+
+  // 1. 기본 정렬 수행
   const sortedRanking = useMemo(() => sortTeams(teams), [teams]);
-  const ranking = useMemo(() => addCompetitionRanks(sortedRanking), [sortedRanking]);
-  const leader = ranking[0];
+
+  // 2. 전체 경기 수 확인 (아무것도 입력되지 않은 상태 체크용)
+  const totalGamesPlayed = useMemo(() => {
+    return teams.reduce((acc, team) => acc + gameCount(team), 0);
+  }, [teams]);
+
+  // 3. 공동 순위를 반영한 최종 랭킹 데이터 생성
+  const ranking = useMemo(() => {
+    let currentRank = 1;
+    return sortedRanking.map((team, index) => {
+      // 아무 경기도 치러지지 않았다면 무조건 다 공동 1위
+      if (totalGamesPlayed === 0) {
+        return { ...team, displayRank: 1 };
+      }
+
+      if (index > 0) {
+        const prev = sortedRanking[index - 1];
+        // 순위 결정 기준 4가지가 모두 같으면 공동 순위 유지
+        const isEqual =
+          winRate(prev) === winRate(team) &&
+          averageScoreRaw(prev) === averageScoreRaw(team) &&
+          setDiff(prev) === setDiff(team) &&
+          prev.setWins === team.setWins;
+
+        if (!isEqual) {
+          currentRank = index + 1; // 같지 않다면 현재 인덱스 기반 번호로 건너뜀 (예: 1위가 3명이면 다음은 4위)
+        }
+      }
+      return { ...team, displayRank: currentRank };
+    });
+  }, [sortedRanking, totalGamesPlayed]);
+
   const canEdit = isAdmin && adminUnlocked;
   const canSubmit = canEdit && selectedBoth && completeSets && !saving;
 
@@ -465,8 +451,8 @@ export default function App() {
           </div>
 
           <div className="podium">
-            {ranking.slice(0, 3).map((team, index) => (
-              <div className={`podium-item top-${index + 1}`} key={team.name}>
+            {ranking.slice(0, 3).map((team) => (
+              <div className={`podium-item top-${team.displayRank <= 3 ? team.displayRank : 3}`} key={team.name}>
                 <span>{team.displayRank}위</span>
                 <strong>{team.name}</strong>
                 <em>{winRateText(team)}</em>
