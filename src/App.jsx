@@ -93,6 +93,10 @@ function averageScoreRaw(team) {
   return games ? setScoreRaw(team) / games : 0;
 }
 
+function remainingGames(team) {
+  return Math.max(0, CLASSES.length - 1 - gameCount(team));
+}
+
 function sortTeams(teams) {
   return [...teams].sort((a, b) => {
     const rateDiff = winRate(b) - winRate(a);
@@ -118,7 +122,7 @@ function withTimeout(promise, ms) {
   let timerId;
   const timer = new Promise((_, reject) => {
     timerId = window.setTimeout(() => {
-      reject(new Error("Firebase 저장 응답이 8초 안에 오지 않았습니다. Firestore Database 생성 여부, Rules 게시 여부, 네트워크 차단 여부를 확인하세요."));
+      reject(new Error("Firebase 저장 응답이 8초 안에 오지 않았습니다."));
     }, ms);
   });
 
@@ -156,39 +160,41 @@ export default function App() {
         : "무승부"
     : "";
 
-  // 1. 기본 정렬 수행
-  const sortedRanking = useMemo(() => sortTeams(teams), [teams]);
+  // 1. 기본 정렬 기준으로 1차 정렬 진행
+  const sortedTeams = useMemo(() => sortTeams(teams), [teams]);
 
-  // 2. 전체 경기 수 확인 (아무것도 입력되지 않은 상태 체크용)
+  // 2. 입력된 총 경기 수 체크 (0이면 경기 결과가 하나도 입력 안 된 상태)
   const totalGamesPlayed = useMemo(() => {
-    return teams.reduce((acc, team) => acc + gameCount(team), 0);
+    return teams.reduce((sum, t) => sum + gameCount(t), 0);
   }, [teams]);
 
-  // 3. 공동 순위를 반영한 최종 랭킹 데이터 생성
+  // 3. 동률 및 초기 미경기 여부를 분석하여 공동 순위가 반영된 새로운 리스트 생성
   const ranking = useMemo(() => {
     let currentRank = 1;
-    return sortedRanking.map((team, index) => {
-      // 아무 경기도 치러지지 않았다면 무조건 다 공동 1위
+    return sortedTeams.map((team, index) => {
+      // 경기 결과 입력이 아무것도 안 됐을 경우에는 모두 공동 1위로 표시
       if (totalGamesPlayed === 0) {
         return { ...team, displayRank: 1 };
       }
 
+      // 두 번째 팀부터는 이전 순위 팀과 기록을 정밀 비교
       if (index > 0) {
-        const prev = sortedRanking[index - 1];
-        // 순위 결정 기준 4가지가 모두 같으면 공동 순위 유지
-        const isEqual =
+        const prev = sortedTeams[index - 1];
+        const isTie =
           winRate(prev) === winRate(team) &&
           averageScoreRaw(prev) === averageScoreRaw(team) &&
           setDiff(prev) === setDiff(team) &&
           prev.setWins === team.setWins;
 
-        if (!isEqual) {
-          currentRank = index + 1; // 같지 않다면 현재 인덱스 기반 번호로 건너뜀 (예: 1위가 3명이면 다음은 4위)
+        // 동률이 아니라면 현재 index 기반 번호로 순위를 건너뜀 (예: 공동1위가 3명이면 다음은 4위)
+        if (!isTie) {
+          currentRank = index + 1;
         }
       }
+
       return { ...team, displayRank: currentRank };
     });
-  }, [sortedRanking, totalGamesPlayed]);
+  }, [sortedTeams, totalGamesPlayed]);
 
   const canEdit = isAdmin && adminUnlocked;
   const canSubmit = canEdit && selectedBoth && completeSets && !saving;
@@ -451,13 +457,17 @@ export default function App() {
           </div>
 
           <div className="podium">
-            {ranking.slice(0, 3).map((team) => (
-              <div className={`podium-item top-${team.displayRank <= 3 ? team.displayRank : 3}`} key={team.name}>
-                <span>{team.displayRank}위</span>
-                <strong>{team.name}</strong>
-                <em>{winRateText(team)}</em>
-              </div>
-            ))}
+            {ranking.slice(0, 3).map((team) => {
+              // 포디움 스타일링을 위해 공동 1위라도 상단 카드 색상은 순서대로 적용되게 가공
+              const visualClass = team.displayRank <= 3 ? team.displayRank : 3;
+              return (
+                <div className={`podium-item top-${visualClass}`} key={team.name}>
+                  <span>{team.displayRank}위</span>
+                  <strong>{team.name}</strong>
+                  <em>{winRateText(team)}</em>
+                </div>
+              );
+            })}
           </div>
 
           <div className="table-wrap">
@@ -477,7 +487,7 @@ export default function App() {
               <tbody>
                 {ranking.map((team) => (
                   <tr key={team.name}>
-                    <td className="rank">{team.displayRank}</td>
+                    <td className="rank">{team.displayRank}위</td>
                     <td className="team-name">{team.name}</td>
                     <td>{gameCount(team)}</td>
                     <td>{team.setWins}</td>
