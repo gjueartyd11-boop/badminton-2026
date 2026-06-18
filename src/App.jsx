@@ -121,13 +121,39 @@ function neededSetDiff(team, leader) {
 }
 
 
-function sortTeams(teams) {
-  return [...teams].sort((a, b) => {
-    const rateDiff = rankRate(b) - rankRate(a);
-    if (rateDiff !== 0) return rateDiff;
+function allTeamsHaveNoResults(teams) {
+  return teams.every((team) => totalSets(team) === 0 && gameCount(team) === 0);
+}
 
-    // 승률이 같은 반은 같은 순위로 처리합니다.
-    // 표시 순서만 보기 좋게 정렬하고, 순위에는 아래 항목을 반영하지 않습니다.
+function buildRankLookup(teams) {
+  const rankByName = new Map();
+
+  // 경기 결과가 하나도 입력되지 않았으면 모든 반을 1위로 표시합니다.
+  if (allTeamsHaveNoResults(teams)) {
+    teams.forEach((team) => rankByName.set(team.name, 1));
+    return rankByName;
+  }
+
+  // 공동 순위 방식: 1, 1, 1, 4 / 1, 2, 2, 4 처럼 동률 인원 수만큼 다음 순위를 건너뜁니다.
+  const sortedRates = teams
+    .map((team) => rankRate(team))
+    .sort((a, b) => b - a);
+
+  teams.forEach((team) => {
+    const myRate = rankRate(team);
+    const rank = sortedRates.filter((rate) => rate > myRate).length + 1;
+    rankByName.set(team.name, rank);
+  });
+
+  return rankByName;
+}
+
+function sortTeams(teams, rankLookup = buildRankLookup(teams)) {
+  return [...teams].sort((a, b) => {
+    const rankDiff = (rankLookup.get(a.name) ?? 1) - (rankLookup.get(b.name) ?? 1);
+    if (rankDiff !== 0) return rankDiff;
+
+    // 같은 순위 안에서는 표를 보기 좋게만 정렬합니다. 순위 계산에는 영향 없습니다.
     const avgPointDiff = averageScoreRaw(b) - averageScoreRaw(a);
     if (avgPointDiff !== 0) return avgPointDiff;
 
@@ -137,23 +163,6 @@ function sortTeams(teams) {
     if (b.setWins !== a.setWins) return b.setWins - a.setWins;
     return a.name.localeCompare(b.name, "ko");
   });
-}
-
-function buildRankLookup(sortedTeams) {
-  const rankByName = new Map();
-  let previousRate = null;
-  let currentRank = 1;
-
-  sortedTeams.forEach((team, index) => {
-    const rate = rankRate(team);
-    if (previousRate === null || rate !== previousRate) {
-      currentRank = index + 1;
-      previousRate = rate;
-    }
-    rankByName.set(team.name, currentRank);
-  });
-
-  return rankByName;
 }
 
 function firebaseErrorText(error) {
@@ -202,8 +211,8 @@ export default function App() {
         ? teamB
         : "무승부"
     : "";
-  const ranking = useMemo(() => sortTeams(teams), [teams]);
-  const rankLookup = useMemo(() => buildRankLookup(ranking), [ranking]);
+  const rankLookup = useMemo(() => buildRankLookup(teams), [teams]);
+  const ranking = useMemo(() => sortTeams(teams, rankLookup), [teams, rankLookup]);
   const leader = ranking[0];
   const canEdit = isAdmin && adminUnlocked;
   const canSubmit = canEdit && selectedBoth && completeSets && !saving;
