@@ -138,7 +138,8 @@ function buildRankLookup(sortedTeams) {
 
   sortedTeams.forEach((team, index) => {
     const rate = winRate(team);
-    if (previousRate === null || rate !== previousRate) {
+    const isSameRate = previousRate !== null && Math.abs(rate - previousRate) < 0.000001;
+    if (previousRate === null || !isSameRate) {
       currentRank = index + 1;
       previousRate = rate;
     }
@@ -504,6 +505,7 @@ export default function App() {
           <div className="rule-note rule-note-lines">
             <p>승률 = (세트승 + 세트무×0.5) ÷ 전체세트</p>
             <p>평균승점 = (세트승 + 세트무×0.5 - 세트패) ÷ 경기수</p>
+            <p>순위는 승률 기준 공동 순위로 표시됩니다. 예: </p>
           </div>
         </section>
 
