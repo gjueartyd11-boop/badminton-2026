@@ -66,6 +66,12 @@ function winRate(team) {
   return total ? (team.setWins + team.setDraws * 0.5) / total : 0;
 }
 
+function rankRate(team) {
+  // 화면에 표시되는 승률(소수 셋째 자리)을 기준으로 동률을 판단합니다.
+  // 경기 결과가 하나도 없으면 모든 반의 rankRate가 0이므로 모두 1위가 됩니다.
+  return Number(winRate(team).toFixed(3));
+}
+
 function winRateText(team) {
   const total = totalSets(team);
   return total ? winRate(team).toFixed(3).replace(/^0/, "") : "-";
@@ -117,9 +123,11 @@ function neededSetDiff(team, leader) {
 
 function sortTeams(teams) {
   return [...teams].sort((a, b) => {
-    const rateDiff = winRate(b) - winRate(a);
+    const rateDiff = rankRate(b) - rankRate(a);
     if (rateDiff !== 0) return rateDiff;
 
+    // 승률이 같은 반은 같은 순위로 처리합니다.
+    // 표시 순서만 보기 좋게 정렬하고, 순위에는 아래 항목을 반영하지 않습니다.
     const avgPointDiff = averageScoreRaw(b) - averageScoreRaw(a);
     if (avgPointDiff !== 0) return avgPointDiff;
 
@@ -134,12 +142,11 @@ function sortTeams(teams) {
 function buildRankLookup(sortedTeams) {
   const rankByName = new Map();
   let previousRate = null;
-  let currentRank = 0;
+  let currentRank = 1;
 
   sortedTeams.forEach((team, index) => {
-    const rate = winRate(team);
-    const isSameRate = previousRate !== null && Math.abs(rate - previousRate) < 0.000001;
-    if (previousRate === null || !isSameRate) {
+    const rate = rankRate(team);
+    if (previousRate === null || rate !== previousRate) {
       currentRank = index + 1;
       previousRate = rate;
     }
@@ -459,14 +466,14 @@ export default function App() {
           </div>
 
           <div className="podium">
-            {ranking.filter((team) => (rankLookup.get(team.name) || 1) <= 3).map((team) => {
-              const rank = rankLookup.get(team.name) || 1;
+            {ranking.filter((team) => (rankLookup.get(team.name) ?? 1) <= 3).map((team) => {
+              const rank = rankLookup.get(team.name) ?? 1;
               return (
-              <div className={`podium-item top-${Math.min(rank, 3)}`} key={team.name}>
-                <span>{rank}위</span>
-                <strong>{team.name}</strong>
-                <em>{winRateText(team)}</em>
-              </div>
+                <div className={`podium-item top-${Math.min(rank, 3)}`} key={team.name}>
+                  <span>{rank}위</span>
+                  <strong>{team.name}</strong>
+                  <em>{winRateText(team)}</em>
+                </div>
               );
             })}
           </div>
@@ -488,7 +495,7 @@ export default function App() {
               <tbody>
                 {ranking.map((team) => (
                   <tr key={team.name}>
-                    <td className="rank">{rankLookup.get(team.name) || 1}</td>
+                    <td className="rank">{rankLookup.get(team.name) ?? 1}</td>
                     <td className="team-name">{team.name}</td>
                     <td>{gameCount(team)}</td>
                     <td>{team.setWins}</td>
@@ -505,7 +512,6 @@ export default function App() {
           <div className="rule-note rule-note-lines">
             <p>승률 = (세트승 + 세트무×0.5) ÷ 전체세트</p>
             <p>평균승점 = (세트승 + 세트무×0.5 - 세트패) ÷ 경기수</p>
-            <p>순위는 승률 기준 공동 순위로 표시됩니다. 예: </p>
           </div>
         </section>
 
