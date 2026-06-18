@@ -1,0 +1,9 @@
+{
+  "name": "6학년 배드민턴 리그전",
+  "short_name": "배드민턴리그",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#0f172a",
+  "icons": []
+}

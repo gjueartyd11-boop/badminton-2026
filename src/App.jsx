@@ -66,12 +66,6 @@ function winRate(team) {
   return total ? (team.setWins + team.setDraws * 0.5) / total : 0;
 }
 
-function rankRate(team) {
-  // 화면에 표시되는 승률(소수 셋째 자리)을 기준으로 동률을 판단합니다.
-  // 경기 결과가 하나도 없으면 모든 반의 rankRate가 0이므로 모두 1위가 됩니다.
-  return Number(winRate(team).toFixed(3));
-}
-
 function winRateText(team) {
   const total = totalSets(team);
   return total ? winRate(team).toFixed(3).replace(/^0/, "") : "-";
@@ -121,39 +115,24 @@ function neededSetDiff(team, leader) {
 }
 
 
-function allTeamsHaveNoResults(teams) {
-  return teams.every((team) => totalSets(team) === 0 && gameCount(team) === 0);
+function rankScore(team) {
+  // 화면에 표시되는 승률 기준으로 공동 순위를 판단합니다.
+  // 경기 결과가 없는 반은 승률 0으로 계산되어, 전체 미입력 시 모두 1위가 됩니다.
+  return Number(winRate(team).toFixed(3));
 }
 
-function buildRankLookup(teams) {
-  const rankByName = new Map();
-
-  // 경기 결과가 하나도 입력되지 않았으면 모든 반을 1위로 표시합니다.
-  if (allTeamsHaveNoResults(teams)) {
-    teams.forEach((team) => rankByName.set(team.name, 1));
-    return rankByName;
-  }
-
-  // 공동 순위 방식: 1, 1, 1, 4 / 1, 2, 2, 4 처럼 동률 인원 수만큼 다음 순위를 건너뜁니다.
-  const sortedRates = teams
-    .map((team) => rankRate(team))
-    .sort((a, b) => b - a);
-
-  teams.forEach((team) => {
-    const myRate = rankRate(team);
-    const rank = sortedRates.filter((rate) => rate > myRate).length + 1;
-    rankByName.set(team.name, rank);
-  });
-
-  return rankByName;
+function displayRank(sortedTeams, index) {
+  const myScore = rankScore(sortedTeams[index]);
+  // 경쟁 순위 방식: 1, 1, 1 다음은 4 / 1, 2, 2 다음은 4
+  return sortedTeams.filter((team) => rankScore(team) > myScore).length + 1;
 }
 
-function sortTeams(teams, rankLookup = buildRankLookup(teams)) {
+function sortTeams(teams) {
   return [...teams].sort((a, b) => {
-    const rankDiff = (rankLookup.get(a.name) ?? 1) - (rankLookup.get(b.name) ?? 1);
-    if (rankDiff !== 0) return rankDiff;
+    const rateDiff = rankScore(b) - rankScore(a);
+    if (rateDiff !== 0) return rateDiff;
 
-    // 같은 순위 안에서는 표를 보기 좋게만 정렬합니다. 순위 계산에는 영향 없습니다.
+    // 승률이 같은 반은 같은 순위입니다. 아래 기준은 같은 순위 안에서 보기 좋게 정렬만 합니다.
     const avgPointDiff = averageScoreRaw(b) - averageScoreRaw(a);
     if (avgPointDiff !== 0) return avgPointDiff;
 
@@ -211,8 +190,7 @@ export default function App() {
         ? teamB
         : "무승부"
     : "";
-  const rankLookup = useMemo(() => buildRankLookup(teams), [teams]);
-  const ranking = useMemo(() => sortTeams(teams, rankLookup), [teams, rankLookup]);
+  const ranking = useMemo(() => sortTeams(teams), [teams]);
   const leader = ranking[0];
   const canEdit = isAdmin && adminUnlocked;
   const canSubmit = canEdit && selectedBoth && completeSets && !saving;
@@ -475,14 +453,14 @@ export default function App() {
           </div>
 
           <div className="podium">
-            {ranking.filter((team) => (rankLookup.get(team.name) ?? 1) <= 3).map((team) => {
-              const rank = rankLookup.get(team.name) ?? 1;
+            {ranking.filter((team, index) => displayRank(ranking, index) <= 3).map((team, index) => {
+              const rank = displayRank(ranking, index);
               return (
-                <div className={`podium-item top-${Math.min(rank, 3)}`} key={team.name}>
-                  <span>{rank}위</span>
-                  <strong>{team.name}</strong>
-                  <em>{winRateText(team)}</em>
-                </div>
+              <div className={`podium-item top-${Math.min(rank, 3)}`} key={team.name}>
+                <span>{rank}위</span>
+                <strong>{team.name}</strong>
+                <em>{winRateText(team)}</em>
+              </div>
               );
             })}
           </div>
@@ -502,9 +480,9 @@ export default function App() {
                 </tr>
               </thead>
               <tbody>
-                {ranking.map((team) => (
+                {ranking.map((team, index) => (
                   <tr key={team.name}>
-                    <td className="rank">{rankLookup.get(team.name) ?? 1}</td>
+                    <td className="rank">{displayRank(ranking, index)}</td>
                     <td className="team-name">{team.name}</td>
                     <td>{gameCount(team)}</td>
                     <td>{team.setWins}</td>
