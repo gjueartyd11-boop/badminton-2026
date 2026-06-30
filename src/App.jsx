@@ -340,7 +340,7 @@ export default function App() {
           <div className="logo">🏸</div>
           <div>
             <h1>6학년 배드민턴 리그전</h1>
-            <p>{isAdmin ? "관리자 화면" : "실시간 순위표"}</p>
+            <p>{isAdmin ? "관리자 화면" : "다치지 말고 화내지 말고 즐기는 마음으로!"}</p>
             <p className={statusClass}>{status}</p>
             {lastSaved && <p className="last-saved">마지막 저장: {lastSaved}</p>}
           </div>
@@ -515,7 +515,7 @@ export default function App() {
           </section>
         )}
 
-        {!isAdmin && <p className="viewer-note">경기 결과 입력은 관리자만 가능합니다.</p>}
+        {!isAdmin && <p className="viewer-note">2026년 나래초등학교 6학년 1학기 배드민턴 리그전</p>}
       </section>
     </main>
   );
